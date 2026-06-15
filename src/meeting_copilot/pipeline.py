@@ -22,11 +22,11 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-from .audio.base import AudioCapture
+from .audio.base import AudioCapture, AudioChunk
 from .db.models import Note, Suggestion, TranscriptSegment
 from .db.repository import Repository
 from .intelligence.notes import NoteExtractor
@@ -217,7 +217,7 @@ class MeetingPipeline:
             self._emit("on_notes", new_notes)
         return new_notes
 
-    def process_chunks(self, meeting_id: int, chunks: Iterable) -> None:
+    def process_chunks(self, meeting_id: int, chunks: Iterable[AudioChunk]) -> None:
         """Run the full pipeline synchronously over an iterable of audio chunks.
 
         This is the deterministic path used by tests and by the threaded runner.
@@ -261,7 +261,9 @@ class MeetingPipeline:
         finally:
             self._emit("on_status", "Stopped")
 
-    def _gated_chunks(self, capture: AudioCapture):  # pragma: no cover - thread/live
+    def _gated_chunks(  # pragma: no cover - thread/live
+        self, capture: AudioCapture
+    ) -> Iterator[AudioChunk]:
         for chunk in capture.read():
             if self._stop_event.is_set():
                 break

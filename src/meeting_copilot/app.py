@@ -14,7 +14,7 @@ from collections.abc import Iterable
 
 from .ai import create_llm
 from .ai.base import LLMClient
-from .audio import AudioCapture, create_audio_capture
+from .audio import AudioCapture, AudioChunk, create_audio_capture
 from .config import AppConfig, load_config
 from .db import Database, Meeting, Repository
 from .intelligence import NoteExtractor, SuggestionEngine
@@ -139,7 +139,7 @@ class AppController:
         self.pipeline.start(meeting.id, capture)
         return meeting
 
-    def process_audio(self, chunks: Iterable) -> None:
+    def process_audio(self, chunks: Iterable[AudioChunk]) -> None:
         """Synchronously process a finite stream of audio chunks.
 
         Useful for headless/offline runs and tests; requires an active meeting.

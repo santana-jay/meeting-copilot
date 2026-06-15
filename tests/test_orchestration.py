@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import time
 
+import pytest
+
 from meeting_copilot.ai import MockLLMClient, create_llm
 from meeting_copilot.ai.anthropic_client import AnthropicClient
 from meeting_copilot.app import AppController
@@ -176,8 +178,6 @@ def test_controller_process_audio_requires_active_meeting():
         stt=MockSTT(phrases=PHRASES),
     )
     try:
-        import pytest
-
         with pytest.raises(RuntimeError):
             controller.process_audio(_chunks())
     finally:

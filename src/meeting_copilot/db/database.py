@@ -15,6 +15,12 @@ class Database:
     The wrapper applies the bundled schema on first use and exposes the raw
     connection for the repository layer. It can run fully in-memory which is
     convenient for tests.
+
+    The connection is opened with ``check_same_thread=False`` so the background
+    capture/processing thread can reuse it. This is safe under the app's
+    single-writer model: the live pipeline thread is the only writer while
+    running and is always stopped before any main-thread writes (stop/purge),
+    and sqlite3 holds the GIL for the duration of each statement.
     """
 
     def __init__(self, path: str | Path = ":memory:") -> None:

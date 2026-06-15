@@ -44,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _print_status(controller: AppController) -> None:
+    from .audio import available_backends
+
     config = controller.config
     has_key = bool(controller.secrets.get_anthropic_api_key())
     print("Meeting Copilot — headless status")
@@ -51,18 +53,30 @@ def _print_status(controller: AppController) -> None:
     print(f"  database:        {config.database_path()}")
     print(f"  anthropic model: {config.anthropic_model}")
     print(f"  anthropic key:   {'present' if has_key else 'MISSING'}")
+    print(f"  llm mode:        {'anthropic' if has_key else 'mock (offline)'}")
     print(f"  stt backend:     {config.stt_backend}")
     print(f"  audio backend:   {config.audio_backend}")
+    print(f"  audio available: {', '.join(available_backends()) or 'none'}")
     print(f"  ui available:    {is_ui_available()}")
 
 
 def _run_gui(controller: AppController) -> int:  # pragma: no cover - requires Qt
+    from .pipeline import CallbackSink
     from .ui.overlay import Overlay
     from .ui.tray import TrayApp
 
     overlay = Overlay(opacity=controller.config.overlay_opacity)
     overlay.build()
     overlay.apply_capture_exclusion()
+    overlay.show()
+
+    view = _OverlayView(overlay)
+    controller.sink = CallbackSink(
+        status=view.set_status,
+        transcript=view.add_transcript,
+        notes=view.add_notes,
+        suggestion=view.set_suggestion,
+    )
 
     tray = TrayApp(
         on_stop=controller.stop_meeting,
@@ -70,8 +84,44 @@ def _run_gui(controller: AppController) -> int:  # pragma: no cover - requires Q
         on_purge=controller.purge_all,
         on_toggle_overlay=overlay.toggle,
     )
-    controller.start_meeting()
+    controller.start_live_capture()
     return tray.run()
+
+
+class _OverlayView:  # pragma: no cover - requires Qt + display
+    """Render incremental pipeline updates into the overlay label."""
+
+    def __init__(self, overlay) -> None:
+        self._overlay = overlay
+        self._status = "Listening…"
+        self._last_line = ""
+        self._suggestion = ""
+
+    def _render(self) -> None:
+        parts = [self._status]
+        if self._last_line:
+            parts.append(f"❝ {self._last_line}")
+        if self._suggestion:
+            parts.append(f"💡 {self._suggestion}")
+        self._overlay.set_text("\n".join(parts))
+
+    def set_status(self, text: str) -> None:
+        self._status = text
+        self._render()
+
+    def add_transcript(self, segment) -> None:
+        self._last_line = segment.text
+        self._render()
+
+    def add_notes(self, notes) -> None:
+        self._render()
+
+    def set_suggestion(self, suggestion) -> None:
+        cite = ""
+        if suggestion.citations and suggestion.citations[0].quote:
+            cite = f"  (cited: “{suggestion.citations[0].quote}”)"
+        self._suggestion = f"{suggestion.content}{cite}"
+        self._render()
 
 
 if __name__ == "__main__":

@@ -21,7 +21,11 @@ class Database:
         self._path = str(path)
         if self._path != ":memory:":
             Path(self._path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self._path)
+        # ``check_same_thread=False`` lets the background processing thread reuse
+        # this connection. Access is serialized by the app (the live capture
+        # thread is the sole writer and is stopped before any main-thread writes),
+        # and sqlite3 holds the GIL for the duration of each statement.
+        self._conn = sqlite3.connect(self._path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._initialize()

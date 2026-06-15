@@ -23,6 +23,12 @@ after this architecture and stack are explicitly approved.
    - PySide6 system tray app
    - Global hotkey to toggle a small always-on-top overlay
    - Settings, pause/stop/purge controls, and a visible recording indicator
+   - The overlay is **private to the local user only**: while running it must be
+     excluded from screen sharing and screen recording so other meeting
+     participants never see it, using each platform's screen-capture exclusion
+     API (Windows `SetWindowDisplayAffinity` with `WDA_EXCLUDEFROMCAPTURE`,
+     macOS `NSWindow.sharingType = .none`, and the equivalent capture-exclusion
+     hint on Linux), and never appears when the app is not running
 
 2. **Audio capture layer**
    - `AudioCapture` abstraction with runtime-selected platform backends
@@ -46,6 +52,17 @@ after this architecture and stack are explicitly approved.
    - SQLite for meetings, transcript segments, notes, suggestions, citations, and embeddings
    - Audio never stored in the cloud
    - Only relevant transcript text sent to Anthropic
+
+### Privacy and visibility requirements
+
+- The suggestions overlay must be visible **only to the local user** while the
+  app is running, and must be excluded from screen sharing/recording so other
+  meeting participants cannot see it
+- Use platform screen-capture exclusion APIs to enforce this (Windows
+  `WDA_EXCLUDEFROMCAPTURE`, macOS `NSWindowSharingNone`, Linux capture-exclusion
+  hints) and degrade gracefully where the platform cannot guarantee exclusion
+- The overlay and any windows must not appear when the app is not running
+- Audio never leaves the machine; only relevant transcript text is sent to Anthropic
 
 ### Anti-hallucination requirements
 

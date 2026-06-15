@@ -1,10 +1,58 @@
 # Meeting Copilot
 
+## Implementation status
+
+The non-UI core and a thin desktop shell are now implemented as an installable
+Python package under `src/meeting_copilot/`. The original architecture proposal
+follows below and remains the source of truth for the roadmap.
+
+### What is built
+
+- **Skeleton application (Milestone 2):** layered configuration, secret handling
+  (env + OS keychain), SQLite schema/repository (meetings, transcript segments,
+  notes, suggestions, citations, embeddings), an app controller with
+  start/pause/stop/purge, and a headless-safe Qt UI shell (tray, private overlay
+  with screen-capture exclusion, settings).
+- **Non-UI core (Milestone-spanning interfaces):**
+  - `audio/` — `AudioCapture` abstraction with Windows/macOS/Linux backends
+    (lazy native deps, clear degraded-mode guidance) and a null backend.
+  - `stt/` — pluggable `STTService` with a deterministic mock and a lazy
+    `faster-whisper` backend.
+  - `ai/` — `LLMClient` interface, an Anthropic Claude Messages client (model id
+    supplied by config, not hardcoded), and a scriptable mock.
+  - `retrieval/` — embedding interface with a dependency-free hashing embedder
+    and a SQLite-backed cosine vector store.
+  - `intelligence/` — JSON-schema validation, grounded note extraction, and
+    citation-aware suggestions with grounding checks, confidence gating, and
+    first-class abstention.
+
+Real audio capture, streaming STT decoding, and the live Qt event loop require
+their optional dependencies and a real desktop session; the rest of the core is
+fully unit-tested offline (see `tests/`).
+
+### Getting started
+
+```bash
+pip install -e ".[dev]"      # core + pytest/ruff
+ruff check .                 # lint
+pytest                       # run the offline test suite
+python -m meeting_copilot --status   # headless config/status summary
+```
+
+Optional extras: `.[ui]` (PySide6), `.[ai]` (anthropic), `.[stt]`
+(faster-whisper), `.[keyring]` (OS keychain).
+
+Provide the Anthropic API key via the `ANTHROPIC_API_KEY` environment variable
+or the OS keychain — it is never written to config or the database.
+
+---
+
 ## Architecture proposal and stack confirmation
 
 This repository is currently in the **plan-first** stage for a cross-platform
 background meeting co-pilot. The initial implementation should proceed only
 after this architecture and stack are explicitly approved.
+
 
 ### Proposed stack
 

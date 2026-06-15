@@ -1,10 +1,75 @@
 # Meeting Copilot
 
+## Implementation status
+
+The application is now wired end-to-end. The non-UI core, the live processing
+pipeline that connects every component, and a thin desktop shell are implemented
+as an installable Python package under `src/meeting_copilot/`. The original
+architecture proposal follows below and remains the source of truth for the
+roadmap.
+
+### What is built
+
+- **Skeleton application (Milestone 2):** layered configuration, secret handling
+  (env + OS keychain), SQLite schema/repository (meetings, transcript segments,
+  notes, suggestions, citations, embeddings), an app controller with
+  start/pause/stop/purge, and a headless-safe Qt UI shell (tray, private overlay
+  with screen-capture exclusion, settings).
+- **Live processing pipeline (`pipeline.py`):** the orchestration layer that ties
+  the components together. For each meeting it runs
+  audio capture → STT → persist segment → index embedding → grounded note
+  extraction → retrieval over earlier snippets → citation-checked suggestion,
+  emitting incremental updates to a sink (the overlay). It runs synchronously for
+  offline/headless use and on a background thread for live capture. The
+  `AppController` builds the pipeline from config (STT, audio, embeddings, and
+  LLM backends), and `create_llm` selects the Anthropic client when an API key is
+  present or a deterministic offline mock otherwise.
+- **Non-UI core (Milestone-spanning interfaces):**
+  - `audio/` — `AudioCapture` abstraction with Windows/macOS/Linux backends
+    (lazy native deps, clear degraded-mode guidance) and a null backend.
+  - `stt/` — pluggable `STTService` with a deterministic mock and a lazy
+    `faster-whisper` backend.
+  - `ai/` — `LLMClient` interface, an Anthropic Claude Messages client (model id
+    supplied by config, not hardcoded), a scriptable mock, and a `create_llm`
+    factory.
+  - `retrieval/` — embedding interface with a dependency-free hashing embedder
+    and a SQLite-backed cosine vector store.
+  - `intelligence/` — JSON-schema validation, grounded note extraction, and
+    citation-aware suggestions with grounding checks, confidence gating, and
+    first-class abstention.
+
+Real audio capture, streaming STT decoding, and the live Qt event loop require
+their optional dependencies and a real desktop session; the rest of the core —
+including the full pipeline orchestration — is fully unit-tested offline (see
+`tests/`).
+
+### Getting started
+
+```bash
+pip install -e ".[dev]"      # core + pytest/ruff
+ruff check .                 # lint
+pytest                       # run the offline test suite
+python -m meeting_copilot --status   # headless config/status summary
+```
+
+Launching `python -m meeting_copilot` with PySide6 installed starts the tray
+app, shows the private overlay, and begins live capture + processing; without a
+GUI it prints the headless status summary instead.
+
+Optional extras: `.[ui]` (PySide6), `.[ai]` (anthropic), `.[stt]`
+(faster-whisper), `.[keyring]` (OS keychain).
+
+Provide the Anthropic API key via the `ANTHROPIC_API_KEY` environment variable
+or the OS keychain — it is never written to config or the database.
+
+---
+
 ## Architecture proposal and stack confirmation
 
 This repository is currently in the **plan-first** stage for a cross-platform
 background meeting co-pilot. The initial implementation should proceed only
 after this architecture and stack are explicitly approved.
+
 
 ### Proposed stack
 
